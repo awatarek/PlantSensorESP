@@ -43,62 +43,22 @@ void WiFiManager::checkNetworkChange() {
     _prefs.end();
 }
 
-
 void WiFiManager::startAP() {
+
     Serial.println("Starting AP mode...");
 
     WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
-    delay(500);
+    WiFi.mode(WIFI_AP);
 
-    WiFi.mode(WIFI_AP_STA);
     WiFi.softAP("Plant-Sensor-Setup", "plantsetup");
-    WiFi.softAPConfig(IPAddress(10,0,0,1),
-                      IPAddress(10,0,0,1),
-                      IPAddress(255,255,255,0));
+    WiFi.softAPConfig(
+        IPAddress(10,0,0,1),
+        IPAddress(10,0,0,1),
+        IPAddress(255,255,255,0)
+    );
 
-    delay(500);
-
-    String networkList = buildNetworkList();
-
-    _server.on("/", HTTP_GET, [this, networkList](AsyncWebServerRequest *request) {
-        request->send(200, "text/html",
-            "<h2>WiFi Setup</h2>"
-            "<form method='POST' action='/save_wifi'>"
-            "<h3>Select Network:</h3>" +
-            networkList +
-            "<br>Password:<br>"
-            "<input name='pass' type='password'><br><br>"
-            "<input type='submit' value='Connect'>"
-            "</form>");
-    });
-
-    _server.on("/save_wifi", HTTP_POST, [this](AsyncWebServerRequest *request) {
-
-        if (!request->hasParam("ssid", true) || !request->hasParam("pass", true)) {
-            request->send(400, "text/html", "<h3>Missing parameters</h3>");
-            return;
-        }
-
-        String new_ssid = request->getParam("ssid", true)->value();
-        String new_pass = request->getParam("pass", true)->value();
-
-        request->send(200, "text/html",
-            "<h3>Connecting to WiFi...</h3>"
-            "<p>Please wait...</p>");
-
-        Serial.println("Selected SSID: " + new_ssid);
-
-        _prefs.begin("config", false);
-        _prefs.putString("ssid", new_ssid);
-        _prefs.putString("wpass", new_pass);
-        _prefs.end();
-
-        delay(1000);
-        ESP.restart();
-    });
-
-    _server.begin();
+    Serial.println("AP started.");
+    Serial.println(WiFi.softAPIP());
 }
 
 bool WiFiManager::connectWiFi() {
@@ -118,12 +78,10 @@ bool WiFiManager::connectWiFi() {
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid.c_str(), pass.c_str());
 
-    WiFi.setAutoReconnect(true);
-    WiFi.persistent(true);
-
     unsigned long start = millis();
 
-    while (WiFi.status() != WL_CONNECTED && millis() - start < 15000) {
+    while (WiFi.status() != WL_CONNECTED &&
+           millis() - start < 15000) {
         delay(500);
         Serial.print(".");
     }
@@ -136,4 +94,25 @@ bool WiFiManager::connectWiFi() {
 
     Serial.println("\nWiFi connection failed.");
     return false;
+}
+
+void WiFiManager::saveCredentials(const String& ssid,
+                                  const String& pass) {
+
+    _prefs.begin("config", false);
+    _prefs.putString("ssid", ssid);
+    _prefs.putString("wpass", pass);
+    _prefs.end();
+}
+
+void WiFiManager::clearCredentials() {
+
+    _prefs.begin("config", false);
+    _prefs.remove("ssid");
+    _prefs.remove("wpass");
+    _prefs.end();
+}
+
+bool WiFiManager::isConnected() {
+    return WiFi.status() == WL_CONNECTED;
 }

@@ -16,39 +16,6 @@ void MQTTManager::loadConfig() {
     _prefs.end();
 }
 
-void MQTTManager::registerSetupPage() {
-
-    _server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-        request->send(200, "text/html",
-            "<h2>MQTT Setup</h2>"
-            "<form method='POST' action='/save_mqtt'>"
-            "Broker IP:<br><input name='broker'><br>"
-            "Username:<br><input name='user'><br>"
-            "Password:<br><input name='pass' type='password'><br><br>"
-            "<input type='submit' value='Save'>"
-            "</form>");
-    });
-
-    _server.on("/save_mqtt", HTTP_POST, [this](AsyncWebServerRequest *request) {
-
-        String broker = request->getParam("broker", true)->value();
-        String user   = request->getParam("user", true)->value();
-        String pass   = request->getParam("pass", true)->value();
-
-        _prefs.begin("config", false);
-        _prefs.putString("broker", broker);
-        _prefs.putString("muser", user);
-        _prefs.putString("mpass", pass);
-        _prefs.end();
-
-        request->send(200, "text/html",
-            "<h3>MQTT Saved. Rebooting...</h3>");
-
-        delay(1000);
-        ESP.restart();
-    });
-}
-
 void MQTTManager::begin() {
 
     loadConfig();
@@ -86,21 +53,38 @@ String MQTTManager::getMacAddress() {
 }
 
 void MQTTManager::publishDiscovery() {
+    publishSensor("soil", "Soil Moisture", "%", "humidity");
+    publishSensor("voltage", "Soil Voltage", "V", "");
+    publishSensor("status", "Soil Status", "", "");
+}
+
+void MQTTManager::publishSensor(const String& id,
+                                const String& name,
+                                const String& unit,
+                                const String& deviceClass) {
 
     String mac = getMacAddress();
 
-    String topic =
-        "homeassistant/sensor/plant_sensor_" + mac + "/config";
+    String baseTopic = "plant/" + mac;
+    String stateTopic = baseTopic + "/" + id;
 
-    String uniqueId =
-        "plant_sensor_" + mac + "_soil";
+    String configTopic =
+        "homeassistant/sensor/plant_sensor_" + mac + "_" + id + "/config";
+
+    String uniqueId = "plant_sensor_" + mac + "_" + id;
 
     String payload = "{";
-    payload += "\"name\":\"Soil Moisture\",";
-    payload += "\"state_topic\":\"plant/soil\",";
-    payload += "\"unit_of_measurement\":\"%\",";
-    payload += "\"device_class\":\"humidity\",";
+    payload += "\"name\":\"" + name + "\",";
+    payload += "\"state_topic\":\"" + stateTopic + "\",";
+
+    if (unit != "")
+        payload += "\"unit_of_measurement\":\"" + unit + "\",";
+
+    if (deviceClass != "")
+        payload += "\"device_class\":\"" + deviceClass + "\",";
+
     payload += "\"unique_id\":\"" + uniqueId + "\",";
+
     payload += "\"device\":{";
     payload += "\"identifiers\":[\"plant_sensor_" + mac + "\"],";
     payload += "\"name\":\"Plant Sensor " + mac + "\",";
@@ -108,12 +92,51 @@ void MQTTManager::publishDiscovery() {
     payload += "\"model\":\"ESP32 Plant Monitor\"";
     payload += "}}";
 
-    _mqttClient.publish(topic.c_str(), 0, true, payload.c_str());
+    _mqttClient.publish(configTopic.c_str(), 0, true, payload.c_str());
 }
 
-void MQTTManager::publishSoil(float percent) {
+void MQTTManager::saveCredentials(const String& broker,
+                                  const String& user,
+                                  const String& pass) {
 
-    if (_mqttClient.connected()) {
-        _mqttClient.publish("plant/soil", 0, false, String(percent).c_str());
-    }
+    _prefs.begin("config", false);
+    _prefs.putString("broker", broker);
+    _prefs.putString("muser", user);
+    _prefs.putString("mpass", pass);
+    _prefs.end();
+
+    _broker = broker;
+    _user   = user;
+    _pass   = pass;
+}
+
+void MQTTManager::clearCredentials() {
+
+    _prefs.begin("config", false);
+    _prefs.remove("broker");
+    _prefs.remove("muser");
+    _prefs.remove("mpass");
+    _prefs.end();
+
+    _broker = "";
+    _user   = "";
+    _pass   = "";
+}
+
+void MQTTManager::publishValue(const String& id, const String& value) {
+
+    if (!_mqttClient.connected()) return;
+
+    String mac = getMacAddress();
+    String topic = "plant/" + mac + "/" + id;
+
+    _mqttClient.publish(topic.c_str(), 0, false, value.c_str());
+}
+
+bool MQTTManager::isConfigured() {
+    return _broker != "";
+}
+
+bool MQTTManager::isConnected() {
+    return _mqttClient.connected();
 }

@@ -11,10 +11,15 @@ public:
                 AsyncMqttClient& mqttClient,
                 Preferences& prefs);
 
-    void registerSetupPage();
     void begin();
-    void publishSoil(float percent);
-
+    void publishValue(const String& id, const String& value);
+    bool isConfigured();
+    bool isConnected();
+    void saveCredentials(const String& broker,
+                     const String& user,
+                     const String& pass);
+    void clearCredentials();
+    
 private:
     AsyncWebServer& _server;
     AsyncMqttClient& _mqttClient;
@@ -25,7 +30,11 @@ private:
     String _pass;
 
     void loadConfig();
-    void publishDiscovery();
+    void publishDiscovery();    
+    void publishSensor(const String& id,
+                   const String& name,
+                   const String& unit,
+                   const String& deviceClass);
     String getMacAddress();
 };
 
