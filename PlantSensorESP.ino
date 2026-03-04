@@ -9,7 +9,7 @@
 #include "website.h"
 #include "soil_sensor.h"
 
-#define SOIL_PIN 35
+#define SOIL_PIN 8
 
 Preferences prefs;
 AsyncWebServer server(80);
@@ -22,7 +22,16 @@ SoilSensor soil(SOIL_PIN);
 
 void setup() {
   Serial.begin(115200);
-  Serial.begin(115200);
+  delay(1500); 
+  
+  Serial.println();
+  Serial.println("===BOOT===");
+  Serial.print("=== ");
+  Serial.print(__DATE__);
+  Serial.print(" ");
+  Serial.print(__TIME__);
+  Serial.println(" ===");
+  Serial.println();
 
   // 1️⃣ Spróbuj połączyć WiFi
   bool wifiOk = wifiManager.connectWiFi();

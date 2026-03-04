@@ -1,4 +1,7 @@
 #include "wifi_manager.h"
+#if defined(ESP32)
+  #include "esp_wifi.h"
+#endif
 
 WiFiManager::WiFiManager(AsyncWebServer& server, Preferences& prefs)
     : _server(server), _prefs(prefs) {}
@@ -50,7 +53,21 @@ void WiFiManager::startAP() {
     WiFi.disconnect(true);
     WiFi.mode(WIFI_AP);
 
-    WiFi.softAP("Plant-Sensor-Setup", "plantsetup");
+    #ifdef esp_wifi_set_country
+
+        wifi_country_t country = {
+            .cc = "PL",
+            .schan = 1,
+            .nchan = 13,
+            .policy = WIFI_COUNTRY_POLICY_AUTO
+        };
+
+        esp_wifi_set_country(&country);
+
+    #endif
+
+    WiFi.softAP("Plant-Sensor-Setup", "plantsetup", 6, false, 4);    
+    WiFi.setTxPower(WIFI_POWER_19_5dBm);
     WiFi.softAPConfig(
         IPAddress(10,0,0,1),
         IPAddress(10,0,0,1),
