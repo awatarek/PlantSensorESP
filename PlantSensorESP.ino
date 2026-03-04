@@ -8,6 +8,7 @@
 #include "mqtt_manager.h"
 #include "website.h"
 #include "soil_sensor.h"
+#include "web_server.h"
 
 #define SOIL_PIN 8
 
@@ -19,6 +20,7 @@ WiFiManager wifiManager(server, prefs);
 MQTTManager mqttManager(server, mqttClient, prefs);
 Website website(mqttClient);
 SoilSensor soil(SOIL_PIN);
+WebServerManager webServer(server, wifiManager, mqttManager, website, soil);
 
 void setup() {
   Serial.begin(115200);
@@ -33,7 +35,17 @@ void setup() {
   Serial.println(" ===");
   Serial.println();
 
-  // 1️⃣ Spróbuj połączyć WiFi
+  prefs.begin("plant", true);
+
+  PlantConfig plant;
+  plant.name = prefs.getString("name", "Plant");
+  plant.minMoisture = prefs.getFloat("min", 30);
+  plant.maxMoisture = prefs.getFloat("max", 70);
+
+  prefs.end();
+
+  soil.setPlantConfig(plant);
+
   bool wifiOk = wifiManager.connectWiFi();
 
   if (!wifiOk) {
@@ -42,75 +54,9 @@ void setup() {
     wifiManager.checkNetworkChange();
   }
 
-  // 2️⃣ Uruchom MQTT (sam sprawdzi czy jest skonfigurowany)
   mqttManager.begin();
 
-  // 3️⃣ Jeden centralny route "/"
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-
-      soil.update();
-
-      bool wifiConnected = wifiManager.isConnected();
-      bool mqttConfigured = mqttManager.isConfigured();
-      bool mqttConnected  = mqttManager.isConnected();
-
-      String networkList = "";
-
-      if (!wifiConnected) {
-          networkList = wifiManager.buildNetworkList();
-      }
-
-      request->send(200, "text/html",
-          website.build(soil,
-                        wifiConnected,
-                        mqttConfigured,
-                        mqttConnected,
-                        networkList));
-  });
-
-  server.on("/save_wifi", HTTP_POST, [](AsyncWebServerRequest *request) {
-
-    if (!request->hasParam("ssid", true) ||
-        !request->hasParam("pass", true)) {
-        request->send(400, "text/plain", "Missing parameters");
-        return;
-    }
-
-    String ssid = request->getParam("ssid", true)->value();
-    String pass = request->getParam("pass", true)->value();
-
-    wifiManager.saveCredentials(ssid, pass);
-
-    request->send(200, "text/html",
-        "<h3>WiFi Saved. Rebooting...</h3>");
-
-    delay(1000);
-    ESP.restart();
-  });
-
-  server.on("/save_mqtt", HTTP_POST, [](AsyncWebServerRequest *request) {
-
-    if (!request->hasParam("broker", true)) {
-        request->send(400, "text/plain", "Missing broker");
-        return;
-    }
-
-    String broker = request->getParam("broker", true)->value();
-    String user   = request->getParam("user", true)->value();
-    String pass   = request->getParam("pass", true)->value();
-
-
-
-    mqttManager.saveCredentials(broker, user, pass);
-
-
-    request->send(200, "text/html",
-        "<h3>MQTT Saved. Rebooting...</h3>");
-
-    delay(1000);
-    ESP.restart();
-  });
-
+  webServer.begin();
 
   server.begin();
 }
@@ -120,10 +66,15 @@ void setup() {
 ============================================================ */
 
 void loop() {
-    soil.update();
+static unsigned long last = 0;
+  if (millis() - last > 5000) {
 
-    mqttManager.publishValue("soil", String(soil.getPercent()));
-    mqttManager.publishValue("voltage", String(soil.getVoltage()));
-    mqttManager.publishValue("status", soil.getStatus());
-    delay(5000);
+      soil.update();
+
+      mqttManager.publishValue("soil", String(soil.getPercent()));
+      mqttManager.publishValue("voltage", String(soil.getVoltage()));
+      mqttManager.publishValue("status", soil.getStatus());
+
+      last = millis();
+  }
 }

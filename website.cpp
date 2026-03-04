@@ -1,6 +1,7 @@
 #include "website.h"
 #include "soil_sensor.h"
 
+
 Website::Website(AsyncMqttClient& mqttClient)
     : _mqttClient(mqttClient) {}
 
@@ -9,6 +10,8 @@ String Website::build(const SoilSensor& soil,
                       bool mqttConfigured,
                       bool mqttConnected,
                       const String& networkList) {
+
+    PlantConfig plant = soil.getPlantConfig();           
 
     String html;
     html.reserve(4000);
@@ -40,6 +43,39 @@ String Website::build(const SoilSensor& soil,
 
     html += "<p class='" + cssClass + "'>" + status + "</p>";
     html += "</div>";
+
+
+    html += "<div class='card'>";
+    html += "<h3>Plant Settings</h3>";
+
+    html += "<p>Current name: <b>";
+    html += plant.name;
+    html += "</b></p>";
+
+    html += "<p>Current min: <b>";
+    html += String(plant.minMoisture, 1);
+    html += " %</b></p>";
+
+    html += "<p>Current max: <b>";
+    html += String(plant.maxMoisture, 1);
+    html += " %</b></p>";
+
+    html += "<form method='POST' action='/save_plant'>";
+
+    html += "Plant name<br>";
+    html += "<input name='name' value='" + plant.name + "'><br>";
+
+    html += "Min moisture (%)<br>";
+    html += "<input name='min' type='number' value='" + String(plant.minMoisture, 1) + "'><br>";
+
+    html += "Max moisture (%)<br>";
+    html += "<input name='max' type='number' value='" + String(plant.maxMoisture, 1) + "'><br><br>";
+
+    html += "<input type='submit' value='Save Plant'>";
+    html += "</form>";
+
+    html += "</div>";
+
 
     if (!wifiConnected) {
 

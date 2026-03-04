@@ -30,12 +30,31 @@ void MQTTManager::begin() {
     _mqttClient.onConnect([this](bool sessionPresent) {
         Serial.println("MQTT Connected!");
         publishDiscovery();
+
+        String mac = getMacAddress();
+
+        _mqttClient.subscribe(("plant/" + mac + "/config/name").c_str(), 0);
+        _mqttClient.subscribe(("plant/" + mac + "/config/min").c_str(), 0);
+        _mqttClient.subscribe(("plant/" + mac + "/config/max").c_str(), 0);
     });
 
     _mqttClient.onDisconnect([](AsyncMqttClientDisconnectReason reason) {
         Serial.print("MQTT Disconnected. Reason: ");
         Serial.println((int)reason);
     });
+
+    _mqttClient.onMessage([this](char* topic, char* payload,
+                             AsyncMqttClientMessageProperties properties,
+                             size_t len, size_t index, size_t total) {
+        String t = String(topic);
+        String msg;
+
+        for (size_t i = 0; i < len; i++)
+            msg += (char)payload[i];
+
+        handleCommand(t, msg);
+    });
+
 
     _mqttClient.connect();
 }
@@ -56,6 +75,9 @@ void MQTTManager::publishDiscovery() {
     publishSensor("soil", "Soil Moisture", "%", "humidity");
     publishSensor("voltage", "Soil Voltage", "V", "");
     publishSensor("status", "Soil Status", "", "");
+    publishNumber("min", "Min Moisture", "%");
+    publishNumber("max", "Max Moisture", "%");
+    publishText("name", "Plant Name");
 }
 
 void MQTTManager::publishSensor(const String& id,
@@ -95,6 +117,7 @@ void MQTTManager::publishSensor(const String& id,
     _mqttClient.publish(configTopic.c_str(), 0, true, payload.c_str());
 }
 
+
 void MQTTManager::saveCredentials(const String& broker,
                                   const String& user,
                                   const String& pass) {
@@ -133,10 +156,87 @@ void MQTTManager::publishValue(const String& id, const String& value) {
     _mqttClient.publish(topic.c_str(), 0, false, value.c_str());
 }
 
+void MQTTManager::publishText(const String& id,
+                              const String& name) {
+
+    String mac = getMacAddress();
+
+    String topic =
+        "homeassistant/text/plant_sensor_" + mac + "_" + id + "/config";
+
+    String base = "plant/" + mac + "/config/";
+
+    String payload = "{";
+    payload += "\"name\":\"" + name + "\",";
+    payload += "\"command_topic\":\"" + base + id + "\"";
+    payload += "}";
+
+    _mqttClient.publish(topic.c_str(), 0, true, payload.c_str());
+}
+
+void MQTTManager::publishNumber(const String& id,
+                                const String& name,
+                                const String& unit) {
+
+    String mac = getMacAddress();
+
+    String topic =
+        "homeassistant/number/plant_sensor_" + mac + "_" + id + "/config";
+
+    String base = "plant/" + mac + "/config/";
+
+    String payload = "{";
+    payload += "\"name\":\"" + name + "\",";
+    payload += "\"command_topic\":\"" + base + id + "\",";
+    payload += "\"unit_of_measurement\":\"" + unit + "\"";
+    payload += "}";
+
+    _mqttClient.publish(topic.c_str(), 0, true, payload.c_str());
+}
+
+void MQTTManager::handleCommand(const String& topic, const String& payload) {
+
+    String mac = getMacAddress();
+    String base = "plant/" + mac + "/config/";
+
+    if (topic == base + "name") {
+
+        _prefs.begin("plant", false);
+        _prefs.putString("name", payload);
+        _prefs.end();
+
+        Serial.println("Plant name updated: " + payload);
+    }
+
+    if (topic == base + "min") {
+
+        _prefs.begin("plant", false);
+        _prefs.putFloat("min", payload.toFloat());
+        _prefs.end();
+
+        Serial.println("Min moisture updated");
+    }
+
+    if (topic == base + "max") {
+
+        _prefs.begin("plant", false);
+        _prefs.putFloat("max", payload.toFloat());
+        _prefs.end();
+
+        Serial.println("Max moisture updated");
+    }
+}
+
 bool MQTTManager::isConfigured() {
     return _broker != "";
 }
 
 bool MQTTManager::isConnected() {
     return _mqttClient.connected();
+}
+
+void MQTTManager::disconnect() {
+    if (_mqttClient.connected()) {
+        _mqttClient.disconnect();
+    }
 }

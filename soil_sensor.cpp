@@ -21,10 +21,25 @@ float SoilSensor::getPercent() const {
 
 String SoilSensor::getStatus() const {
 
-    if (_percent < 30)
+    if (_percent < _plant.minMoisture)
         return "Dry 🌵";
-    else if (_percent < 70)
-        return "Optimal 🌿";
-    else
+
+    else if (_percent < _plant.minMoisture + 5)
+        return "Getting dry ⚠";
+
+    else if (_percent > _plant.maxMoisture)
         return "Wet 💧";
+
+    else if (_percent > _plant.maxMoisture - 5)
+        return "Getting wet ⚠";
+
+    else
+        return "Optimal 🌿";
+}
+void SoilSensor::setPlantConfig(const PlantConfig& config) {
+    _plant = config;
+}
+
+PlantConfig SoilSensor::getPlantConfig() const {
+    return _plant;
 }

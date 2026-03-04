@@ -19,6 +19,7 @@ public:
                      const String& user,
                      const String& pass);
     void clearCredentials();
+    void disconnect();
     
 private:
     AsyncWebServer& _server;
@@ -36,6 +37,12 @@ private:
                    const String& unit,
                    const String& deviceClass);
     String getMacAddress();
+    void handleCommand(const String& topic, const String& payload);
+    void publishNumber(const String& id,
+                                const String& name,
+                                const String& unit);
+    void publishText(const String& id,
+                              const String& name);
 };
 
 #endif

@@ -11,20 +11,58 @@ String WiFiManager::buildNetworkList() {
     Serial.println("Scanning WiFi...");
     int n = WiFi.scanNetworks(false, true);
 
-    String networkList = "";
-
     if (n <= 0) {
-        networkList = "<p>No networks found</p>";
-    } else {
-        for (int i = 0; i < n; ++i) {
-            networkList += "<input type='radio' name='ssid' value='" + WiFi.SSID(i) + "'>";
-            networkList += WiFi.SSID(i);
-            networkList += " (" + String(WiFi.RSSI(i)) + " dBm)<br>";
-        }
+        return "<p>No networks found</p>";
+    }
+
+    struct Network {
+        String ssid;
+        int rssi;
+        bool secure;
+    };
+
+    std::vector<Network> networks;
+
+    for (int i = 0; i < n; i++) {
+
+        int rssi = WiFi.RSSI(i);
+
+        if (rssi < -80) continue;
+
+        String ssid = WiFi.SSID(i);
+
+        if (ssid.length() == 0) continue;
+
+        bool secure = WiFi.encryptionType(i) != WIFI_AUTH_OPEN;
+
+        networks.push_back({ssid, rssi, secure});
     }
 
     WiFi.scanDelete();
-    return networkList;
+
+    std::sort(networks.begin(), networks.end(),
+        [](const Network &a, const Network &b) {
+            return a.rssi > b.rssi;
+        });
+
+    String html;
+    html.reserve(1500);
+
+    for (auto &net : networks) {
+
+        html += "<label>";
+        html += "<input type='radio' name='ssid' value='" + net.ssid + "'>";
+
+        html += net.ssid;
+
+        if (net.secure)
+            html += " 🔒";
+
+        html += " (" + String(net.rssi) + " dBm)";
+        html += "</label><br>";
+    }
+
+    return html;
 }
 
 void WiFiManager::checkNetworkChange() {
