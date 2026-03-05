@@ -7,7 +7,9 @@ void SoilSensor::update() {
 
     _voltage = analogRead(_pin) * (3.3 / 4095.0);
 
-    _percent = (2.2 - _voltage) * (100.0 / (2.2 - 0.89));
+    _percent = (_plant.dryVoltage - _voltage) * 
+            (100.0 / (_plant.dryVoltage - _plant.wetVoltage));
+
     _percent = constrain(_percent, 0, 100);
 }
 

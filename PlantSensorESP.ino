@@ -10,7 +10,7 @@
 #include "soil_sensor.h"
 #include "web_server.h"
 
-#define SOIL_PIN 8
+#define SOIL_PIN D0
 
 Preferences prefs;
 AsyncWebServer server(80);
@@ -24,7 +24,7 @@ WebServerManager webServer(server, wifiManager, mqttManager, website, soil);
 
 void setup() {
   Serial.begin(115200);
-  delay(1500); 
+  delay(3500);
   
   Serial.println();
   Serial.println("===BOOT===");
@@ -41,6 +41,8 @@ void setup() {
   plant.name = prefs.getString("name", "Plant");
   plant.minMoisture = prefs.getFloat("min", 30);
   plant.maxMoisture = prefs.getFloat("max", 70);
+  plant.dryVoltage = prefs.getFloat("dry", 2.2);
+  plant.wetVoltage = prefs.getFloat("wet", 0.9);
 
   prefs.end();
 
@@ -66,7 +68,7 @@ void setup() {
 ============================================================ */
 
 void loop() {
-static unsigned long last = 0;
+  static unsigned long last = 0;
   if (millis() - last > 5000) {
 
       soil.update();
@@ -76,5 +78,18 @@ static unsigned long last = 0;
       mqttManager.publishValue("status", soil.getStatus());
 
       last = millis();
+  }
+
+
+  static unsigned long lastWifiCheck = 0;
+
+  if (millis() - lastWifiCheck > 15000) {
+      lastWifiCheck = millis();
+
+      if (WiFi.status() == WL_CONNECTED) {
+          Serial.print("WiFi RSSI: ");
+          Serial.print(WiFi.RSSI());
+          Serial.println(" dBm");
+      }
   }
 }

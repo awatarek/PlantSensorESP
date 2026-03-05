@@ -96,16 +96,80 @@ void WebServerManager::setupRoutes() {
 
         _wifi.saveCredentials(ssid, pass);
 
-        request->send(200, "text/html",
-            "<h3>WiFi Saved. Rebooting...</h3>");
-
         delay(1000);
         WiFi.disconnect();
         WiFi.begin(ssid.c_str(), pass.c_str());
 
-        request->send(200, "text/html",
-            "<h3>WiFi settings saved.</h3><a href='/'>Back</a>"
-            "<script>setTimeout(()=>location.href='/',1500)</script>");
+
+        Serial.println("Connecting to WiFi...");
+
+        unsigned long start = millis();
+
+        while (WiFi.status() != WL_CONNECTED && millis() - start < 8000) {
+            delay(200);
+            Serial.print(".");
+        }
+
+        if (WiFi.status() == WL_CONNECTED) {
+
+            Serial.println("\nWiFi connected");
+
+            String ip = WiFi.localIP().toString();
+
+            String html;
+            html += "<h3>WiFi connected.</h3>";
+            html += "<p>Device IP: <b>";
+            html += ip;
+            html += "</b></p>";
+            html += "<p>Redirecting...</p>";
+            html += "<script>";
+            html += "setTimeout(()=>location.href='http://";
+            html += ip;
+            html += "',2000)";
+            html += "</script>";
+
+            request->send(200, "text/html", html);
+
+            delay(2000);
+            ESP.restart();
+        }
+        else {
+
+            Serial.println("\nWiFi connection failed");
+
+            request->send(200, "text/html",
+                "<h3>WiFi connection failed!</h3>"
+                "<a href='/'>Back</a>"
+                "<script>setTimeout(()=>location.href='/',1500)</script>");
+        }
+    });
+
+    _server.on("/calibrateDry", HTTP_GET, [&](AsyncWebServerRequest *request) {
+        float voltage = _soil.getVoltage();
+
+        PlantConfig plant = _soil.getPlantConfig();
+        plant.dryVoltage = voltage;
+
+        prefs.begin("plant", false);
+        prefs.putFloat("dry", voltage);
+        prefs.end();
+
+        _soil.setPlantConfig(plant);
+
+        request->send(200, "text/plain", "Dry calibrated");
+    });
+
+    _server.on("/calibrateWet", HTTP_GET, [&](AsyncWebServerRequest *request) {
+        float voltage = _soil.getVoltage();
+        PlantConfig plant = _soil.getPlantConfig();
+        plant.wetVoltage = voltage;
+
+        prefs.begin("plant", false);
+        prefs.putFloat("wet", voltage);
+        prefs.end();
+        _soil.setPlantConfig(plant);
+
+        request->send(200, "text/plain", "Wet calibrated");
     });
 
 
@@ -121,9 +185,6 @@ void WebServerManager::setupRoutes() {
         String pass   = request->getParam("pass", true)->value();
 
         _mqtt.saveCredentials(broker, user, pass);
-
-        request->send(200, "text/html",
-            "<h3>MQTT Saved. Rebooting...</h3>");
 
         delay(1000);
         _mqtt.disconnect();

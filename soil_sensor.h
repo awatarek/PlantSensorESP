@@ -7,6 +7,9 @@ struct PlantConfig {
     String name;
     float minMoisture;
     float maxMoisture;
+
+    float dryVoltage;
+    float wetVoltage;
 };
 
 class SoilSensor {

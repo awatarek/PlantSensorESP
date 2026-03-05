@@ -77,6 +77,19 @@ String Website::build(const SoilSensor& soil,
     html += "</div>";
 
 
+    html += "<div class='card'>";
+    html += "<h3>Sensor calibration</h3>";
+
+    html += "<button onclick=\"fetch('/calibrateDry')\">";
+    html += "Set DRY (sensor in air)";
+    html += "</button>";
+
+    html += "<button onclick=\"fetch('/calibrateWet')\">";
+    html += "Set WET (sensor in water)";
+    html += "</button>";
+    html += "</div>";
+
+
     if (!wifiConnected) {
 
         html += "<div class='card'>";
