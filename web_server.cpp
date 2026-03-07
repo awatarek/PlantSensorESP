@@ -14,10 +14,10 @@ WebServerManager::WebServerManager(AsyncWebServer& server,
       _soil(soil) {}
 
 void WebServerManager::begin() {
-
     setupRoutes();
     _server.begin();
 }
+
 
 void WebServerManager::setupRoutes() {
 
@@ -41,6 +41,16 @@ void WebServerManager::setupRoutes() {
                            mqttConfigured,
                            mqttConnected,
                            networkList));
+    });
+
+    _server.on("/sensor", HTTP_GET, [&](AsyncWebServerRequest *request) {
+        String json = "{";
+        json += "\"percent\":" + String(_soil.getPercent(),1) + ",";
+        json += "\"voltage\":" + String(_soil.getVoltage(),2) + ",";
+        json += "\"status\":\"" + _soil.getStatus() + "\"";
+        json += "}";
+
+        request->send(200, "application/json", json);
     });
 
     _server.on("/save_plant", HTTP_POST, [this](AsyncWebServerRequest *request) {

@@ -32,8 +32,8 @@ String Website::build(const SoilSensor& soil,
 
     html += "<div class='card'>";
     html += "<h3>Soil Moisture</h3>";
-    html += "<p style='font-size:28px'>" + String(soil.getPercent(), 1) + " %</p>";
-    html += "<p>Voltage: " + String(soil.getVoltage(), 2) + " V</p>";
+    html += "<p id='percent' style='font-size:28px'>" + String(soil.getPercent(), 1) + " %</p>";
+    html += "<p id='voltage'>Voltage: " + String(soil.getVoltage(), 2) + " V</p>";
 
     String status = soil.getStatus();
     String cssClass = "good";
@@ -41,7 +41,7 @@ String Website::build(const SoilSensor& soil,
     if (status.indexOf("Dry") >= 0) cssClass = "dry";
     if (status.indexOf("Wet") >= 0) cssClass = "wet";
 
-    html += "<p class='" + cssClass + "'>" + status + "</p>";
+    html += "<p id='status' class='" + cssClass + "'>" + status + "</p>";
     html += "</div>";
 
 
@@ -129,6 +129,34 @@ String Website::build(const SoilSensor& soil,
                 html += "<p>MQTT Disconnected 🔴</p>";
         }
     }
+
+    html += R"(
+        <script>
+        async function updateSensor(){
+
+            const res = await fetch('/sensor');
+            const data = await res.json();
+
+            document.getElementById('percent').innerText =
+                data.percent + " %";
+
+            document.getElementById('voltage').innerText =
+                "Voltage: " + data.voltage + " V";
+
+            const statusEl = document.getElementById('status');
+            statusEl.innerText = data.status;
+
+            statusEl.className = "good";
+
+            if(data.status.includes("Dry")) statusEl.className = "dry";
+            if(data.status.includes("Wet")) statusEl.className = "wet";
+        }
+
+        setInterval(updateSensor,1000);
+
+        </script>
+
+        )";
 
     html += "</body></html>";
     return html;

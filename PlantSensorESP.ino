@@ -83,7 +83,7 @@ void loop() {
 
   static unsigned long lastWifiCheck = 0;
 
-  if (millis() - lastWifiCheck > 15000) {
+  if (millis() - lastWifiCheck > 60000) {
       lastWifiCheck = millis();
 
       if (WiFi.status() == WL_CONNECTED) {
